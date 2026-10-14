@@ -1,0 +1,9 @@
+{
+  "name": "digital-darkroom-studies",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Four standalone interaction studies (Enlarger, Focus, Expose, Develop) for a digital darkroom. Static HTML, no build step.",
+  "scripts": {
+    "start": "npx --yes serve ."
+  }
+}

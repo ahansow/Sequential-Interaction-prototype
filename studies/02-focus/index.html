@@ -1,0 +1,416 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Darkroom Focus</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column. A load screen first, then the darkroom: header (step + instruction), the bench where the photo lives, and a single control that changes each step. Single dark look on purpose: it is a darkroom. */
+:root {
+  --bg: #0b0807;
+  --ink: #e3d9cc;
+  --dim: #7a6d63;
+  --safe: #d0402e;
+  --glow: #ffd9a8;
+  --paper: #ece6da;
+  --tray: #15100e;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding-block: 24px 56px;
+  padding-inline: 16px;
+}
+#lamp {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(255,160,110,.22), rgba(0,0,0,0) 65%);
+  transition: opacity 1.4s ease;
+}
+#flood { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0; background: #ffe9d6; }
+#app { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; overflow-x: clip; --ar: .8; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; min-height: 44px; }
+.brand { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); margin: 0; }
+#back { font-size: 13px; letter-spacing: .06em; padding: 12px 0 12px 12px; }
+header { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+#dots { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+#dots li {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  border: 1px dashed var(--dim); color: var(--dim); padding: 4px 10px;
+}
+#dots li.current { border: 1px solid var(--safe); color: var(--ink); }
+#dots li.done { border: 1px solid var(--dim); color: var(--ink); background: rgba(255,255,255,.05); }
+h1 { font-size: clamp(22px, 5vw, 30px); font-weight: 500; margin: 0; text-wrap: balance; }
+#stephint { margin: 0; color: var(--dim); min-height: 1.5em; }
+
+/* Load screen */
+#intro { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; padding-top: 8px; }
+#intro p { margin: 0; color: var(--dim); max-width: 52ch; }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.linkbtn { font: inherit; color: var(--dim); background: none; border: 0; padding: 12px 4px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.linkbtn:hover { color: var(--ink); }
+.linkbtn:focus-visible { outline: 2px solid var(--safe); outline-offset: 3px; }
+#err { color: #f08a7a; min-height: 1.5em; }
+#dropnote { font-size: 13px; }
+body.dragging #intro { outline: 2px dashed var(--safe); outline-offset: 12px; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.bench {
+  display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start;
+  min-height: 300px; margin-bottom: 24px;
+}
+.bench > * { min-width: 0; }
+/* Easel width follows the photo's shape so tall photos never push the controls off a phone screen */
+.easel { width: min(360px, 100%, calc(46vh * var(--ar) + 28px)); border: 1px dashed var(--dim); padding: 14px; background: #050403; }
+.easel canvas { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); transition: filter .9s ease, opacity .8s ease; filter: blur(16px) brightness(.16); }
+
+.paper {
+  width: 190px; max-width: 100%; background: var(--paper); padding: 10px 10px 30px;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; position: relative; z-index: 3;
+}
+.paper.lifted { cursor: grabbing; transform-origin: center; }
+.paper.in-tray { cursor: default; }
+.paper:focus-visible { outline: 2px solid var(--safe); outline-offset: 4px; }
+.paper canvas { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); opacity: 0; filter: invert(1) contrast(.5) brightness(1.2); }
+/* In the developer the print appears as a negative, then flips to a positive */
+@keyframes develop {
+  0%   { opacity: 0; filter: invert(1) contrast(.5) brightness(1.2); }
+  18%  { opacity: 1; filter: invert(1) contrast(.95) brightness(1); }
+  100% { opacity: 1; filter: invert(0) contrast(1) brightness(1); }
+}
+.paper.developing canvas { animation: develop 9s ease-in-out forwards; }
+.paper.revealed { overflow: hidden; }
+.paper::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.34) 50%, transparent 62%);
+}
+.paper.sheen::after { opacity: 1; animation: sheen 1.3s ease-out forwards; }
+@keyframes sheen { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+#ctl-5.fadein { animation: fadein .9s ease both; }
+@keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.paper .grab { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #8a8174; }
+
+.tray {
+  width: 240px; max-width: 100%; height: 280px; border: 2px dashed var(--dim); background: var(--tray);
+  position: relative; transition: border-color .2s, background .6s;
+}
+.tray.ready { border-color: var(--safe); }
+.tray.active { background: #231713; border-style: solid; }
+/* Tray and paper share one rocking motion (individual translate/rotate props, so the paper's drag transform is untouched) */
+@keyframes agitate {
+  0%   { translate: 0 0;      rotate: 0deg; }
+  15%  { translate: -5px 2px; rotate: -1.4deg; }
+  30%  { translate: 4px -2px; rotate: 1.2deg; }
+  45%  { translate: -4px 1px; rotate: -1deg; }
+  60%  { translate: 5px 2px;  rotate: 1.5deg; }
+  80%  { translate: -3px -1px; rotate: -.8deg; }
+  100% { translate: 0 0;      rotate: 0deg; }
+}
+.tray.agitating, .paper.agitating { animation: agitate 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tray.agitating, .paper.agitating { animation-duration: 3s; } }
+.tray span { position: absolute; top: 8px; left: 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+
+.controls { min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.controls [hidden] { display: none !important; }
+.group { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+
+.switch {
+  font: inherit; color: var(--ink); background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 14px; border: 2px solid var(--ink); padding: 8px 16px 8px 8px;
+}
+.switch .track { width: 64px; height: 36px; border: 2px solid var(--ink); position: relative; }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; background: var(--ink); transition: left .2s, background .2s; }
+.switch[aria-checked="true"] .knob { left: 30px; background: var(--safe); }
+.switch .lbl { letter-spacing: .12em; font-size: 13px; width: 5.5ch; text-align: left; }
+.switch:focus-visible, .btn:focus-visible, input[type=range]:focus-visible, .bulb:focus-visible { outline: 2px solid var(--safe); outline-offset: 4px; }
+
+input[type=range] { width: min(420px, 100%); accent-color: var(--safe); height: 44px; cursor: pointer; }
+input[type=range]:disabled { cursor: default; opacity: .6; }
+.label { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+#focus-state { min-height: 1.5em; }
+
+.btn {
+  font: inherit; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+  background: transparent; border: 2px solid var(--ink); padding: 14px 32px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.btn:hover:not(:disabled) { background: rgba(255,255,255,.08); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* Hold-to-expose light bulb */
+.bulb {
+  position: relative; width: 128px; height: 128px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.bulb:disabled { cursor: default; }
+.bulb .ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ring circle { fill: none; stroke-width: 3; }
+.ring .track { stroke: var(--dim); stroke-dasharray: 3 5; opacity: .75; }
+.ring .prog { stroke: var(--safe); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transform: rotate(-90deg); transform-origin: 60px 60px; }
+.bulb .icon {
+  position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; translate: -50% -50%;
+  fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  transition: fill .12s ease, stroke .12s ease, filter .12s ease;
+}
+.bulb.on .icon { fill: var(--glow); stroke: var(--glow); filter: drop-shadow(0 0 16px rgba(255,190,120,.95)); }
+.bulb.on .fil { stroke: #8f5f2e; }
+.bulb.on { color: var(--glow); }
+#exp-read { font-variant-numeric: tabular-nums; text-transform: none; font-size: 14px; }
+
+#done-msg { font-size: clamp(24px, 6vw, 34px); font-weight: 500; margin: 0; }
+
+@media (max-width: 560px) {
+  .bench { flex-wrap: nowrap; gap: 16px; min-height: 0; }
+  .paper { width: min(190px, 34vw); padding: 8px 8px 26px; }
+  .tray { width: min(240px, 46vw); height: min(280px, 64vw); }
+  .bulb { width: 144px; height: 144px; }
+}
+
+#done { margin-top: 4px; }
+#done.fadein { animation: fadein .9s ease both; }
+#done-sub { margin: 0; color: var(--dim); max-width: 46ch; }
+#choose { font-size: 13px; letter-spacing: .06em; padding: 12px 0 12px 12px; white-space: nowrap; }
+.topbar { flex-wrap: wrap; row-gap: 0; }
+body.dragging #app { outline: 2px dashed var(--safe); outline-offset: 10px; }
+</style>
+
+<input type="file" id="file" accept="image/*">
+<div id="lamp"></div>
+<div id="flood"></div>
+
+<div id="app">
+  <div class="topbar">
+    <p class="brand">Digital Darkroom &middot; Step 2 of 4</p>
+    <button class="linkbtn" id="choose">Use your own photo</button>
+  </div>
+  <header>
+    <ol id="dots" aria-label="Progress"><li data-i="1">Enlarger</li><li data-i="2">Focus</li><li data-i="3">Expose</li><li data-i="4">Develop</li></ol>
+    <h1 id="stepname">Focus the image</h1>
+    <p id="stephint">Drag the slider until the picture is sharp, then lock focus.</p>
+  </header>
+  <section class="bench" id="bench" aria-live="polite">
+    <div class="easel" id="easel">
+      <canvas id="photo" width="480" height="600" role="img" aria-label="The negative of the photograph"></canvas>
+    </div>
+  </section>
+  <section class="controls">
+    <div class="group" id="ctl-2">
+      <span class="label">Focus</span>
+      <input id="focus" type="range" min="0" max="100" value="8" aria-label="Focus">
+      <button class="btn" id="lock-focus">Lock focus</button>
+      <span id="focus-state"></span>
+    </div>
+    <div class="group" id="done" hidden>
+      <p id="done-msg"></p>
+      <p id="done-sub"></p>
+
+      <button class="linkbtn" id="again">Try again</button>
+    </div>
+  </section>
+</div>
+
+<script>
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var AR_MIN = 0.75, AR_MAX = 1.6, LONG = 720, EXPORT_LONG = 2400;
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function drawScene(c) {
+    var W = c.width, H = c.height, ctx = c.getContext('2d'), rand = rng(7), i, x, y;
+    var g = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+    g.addColorStop(0, '#2b2b2b'); g.addColorStop(1, '#d6d6d6');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var rg = ctx.createRadialGradient(340, 200, 10, 340, 200, 170);
+    rg.addColorStop(0, 'rgba(255,255,255,.95)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fafafa'; ctx.beginPath(); ctx.arc(340, 200, 38, 0, Math.PI * 2); ctx.fill();
+    function ridge(base, amp, color, s) {
+      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, H);
+      for (x = 0; x <= W; x += 6) {
+        y = base - amp * (Math.sin(x * .012 + s) + .5 * Math.sin(x * .031 + s * 2) + .25 * Math.sin(x * .07 + s * 3));
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    }
+    ridge(340, 50, '#a0a0a0', 1); ridge(395, 45, '#707070', 3); ridge(440, 30, '#454545', 5);
+    ctx.strokeStyle = '#1e1e1e'; ctx.lineWidth = 3;
+    [[190, 110], [214, 98], [236, 118]].forEach(function (b) {
+      ctx.beginPath(); ctx.moveTo(b[0] - 9, b[1] + 3); ctx.quadraticCurveTo(b[0] - 4, b[1] - 6, b[0], b[1]);
+      ctx.quadraticCurveTo(b[0] + 4, b[1] - 6, b[0] + 9, b[1] + 3); ctx.stroke();
+    });
+    ridge(505, 16, '#171717', 9);
+    ctx.fillStyle = '#0e0e0e'; ctx.fillRect(106, 420, 8, 90);
+    for (i = 0; i < 5; i++) {
+      var y0 = 300 + i * 40, w = 46 + i * 20;
+      ctx.beginPath(); ctx.moveTo(110, y0); ctx.lineTo(110 - w / 2, y0 + 64); ctx.lineTo(110 + w / 2, y0 + 64); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#0d0d0d'; ctx.fillRect(300, 458, 76, 46);
+    ctx.beginPath(); ctx.moveTo(290, 458); ctx.lineTo(338, 422); ctx.lineTo(386, 458); ctx.closePath(); ctx.fill();
+    ctx.fillRect(358, 424, 10, 24);
+    ctx.fillStyle = '#f2f2f2'; ctx.fillRect(322, 474, 15, 15);
+    ctx.fillStyle = '#0d0d0d'; ctx.fillRect(328.5, 474, 2, 15); ctx.fillRect(322, 480.5, 15, 2);
+    var img = ctx.getImageData(0, 0, W, H), d = img.data, n;
+    for (i = 0; i < d.length; i += 4) { n = (rand() - .5) * 36; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    ctx.putImageData(img, 0, 0);
+    var vg = ctx.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, H * .75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+
+  function toGray(c) {
+    var x = c.getContext('2d'), im = x.getImageData(0, 0, c.width, c.height), d = im.data, i, l;
+    for (i = 0; i < d.length; i += 4) {
+      l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      l = (l - 128) * 1.08 + 128;
+      l = l < 0 ? 0 : (l > 255 ? 255 : l);
+      d[i] = d[i + 1] = d[i + 2] = l;
+    }
+    x.putImageData(im, 0, 0);
+  }
+  function fromImage(img, long) {
+    var sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+    var ar = sw / sh, cx = 0, cy = 0, cw = sw, ch = sh, w, h;
+    if (ar < AR_MIN) { ch = sw / AR_MIN; cy = (sh - ch) / 2; ar = AR_MIN; }
+    else if (ar > AR_MAX) { cw = sh * AR_MAX; cx = (sw - cw) / 2; ar = AR_MAX; }
+    var k = Math.min(1, long / Math.max(cw, ch));
+    w = Math.max(1, Math.round(cw * k)); h = Math.max(1, Math.round(ch * k));
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    x.drawImage(img, cx, cy, cw, ch, 0, 0, w, h);
+    toGray(c);
+    return c;
+  }
+  /* Film look: clumped (not per-pixel) grain that is strongest in the midtones, plus a faint lift in the blacks and a soft shoulder in the highlights */
+  function grainify(c, amp, cell, seed) {
+    var w = c.width, h = c.height, x = c.getContext('2d'), r = rng(seed), i;
+    var nw = Math.max(2, Math.round(w / cell)), nh = Math.max(2, Math.round(h / cell));
+    var n = document.createElement('canvas'); n.width = nw; n.height = nh;
+    var nx = n.getContext('2d'), ni = nx.createImageData(nw, nh), nd = ni.data, v;
+    for (i = 0; i < nd.length; i += 4) {
+      v = 128 + (r() + r() + r() - 1.5) * 2 * 42;
+      nd[i] = nd[i + 1] = nd[i + 2] = v < 0 ? 0 : (v > 255 ? 255 : v); nd[i + 3] = 255;
+    }
+    nx.putImageData(ni, 0, 0);
+    var g = document.createElement('canvas'); g.width = w; g.height = h;
+    var gx = g.getContext('2d'); gx.imageSmoothingEnabled = true; gx.imageSmoothingQuality = 'high';
+    gx.drawImage(n, 0, 0, w, h);
+    var gd = gx.getImageData(0, 0, w, h).data, im = x.getImageData(0, 0, w, h), d = im.data, l, wt;
+    for (i = 0; i < d.length; i += 4) {
+      l = d[i];
+      l = 5 + l * 0.955;                                   // faint base fog in the blacks, soft whites
+      wt = 0.45 + 0.55 * (1 - Math.abs(l - 128) / 128);    // more grain in the midtones
+      l += ((gd[i] - 128) / 128) * amp * wt;
+      l = l < 0 ? 0 : (l > 255 ? 255 : l);
+      d[i] = d[i + 1] = d[i + 2] = l;
+    }
+    x.putImageData(im, 0, 0);
+  }
+  function copyCanvas(src) {
+    var c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+    return c;
+  }
+
+
+  var app = $('app'), photo = $('photo'), print = $('print'), exportSrc = null;
+  function setPhoto(src, hi) {
+    exportSrc = hi || src;
+    var w = src.width, h = src.height, i;
+    if (photo) {
+      var neg = copyCanvas(src), nx = neg.getContext('2d'), im = nx.getImageData(0, 0, w, h), d = im.data;
+      for (i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2]; }
+      nx.putImageData(im, 0, 0);
+      photo.width = w; photo.height = h; photo.getContext('2d').drawImage(neg, 0, 0);
+    }
+    if (print) {
+      var pos = copyCanvas(src); grainify(pos, 30, 2, 11);
+      print.width = w; print.height = h; print.getContext('2d').drawImage(pos, 0, 0);
+    }
+    app.style.setProperty('--ar', (w / h).toFixed(4));
+  }
+  function sampleCanvas() { var c = document.createElement('canvas'); c.width = 480; c.height = 600; drawScene(c); return c; }
+  function handleFile(file) {
+    if (!file || (file.type && file.type.indexOf('image/') !== 0)) return;
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      try { setPhoto(fromImage(img, LONG), fromImage(img, EXPORT_LONG)); restart(); } catch (e) {}
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+  var fileInput = $('file');
+  $('choose').addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () { var f = fileInput.files && fileInput.files[0]; fileInput.value = ''; handleFile(f); });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); document.body.classList.add('dragging'); });
+  document.addEventListener('dragleave', function (e) { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault(); document.body.classList.remove('dragging');
+    handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  var lamp = $('lamp'), flood = $('flood'), stepName = $('stepname'), stepHint = $('stephint'), done = $('done');
+  var dots = Array.prototype.slice.call(document.querySelectorAll('#dots li')), timers = [];
+  function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearTimers() { timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
+  function setDots(complete) {
+    dots.forEach(function (li) {
+      var k = +li.getAttribute('data-i');
+      li.className = k < STEP ? 'done' : (k === STEP ? (complete ? 'done' : 'current') : '');
+    });
+  }
+  function showDone(title, sub) {
+    stepName.textContent = title; stepHint.textContent = '';
+    $('done-msg').textContent = title; $('done-sub').textContent = sub;
+    setDots(true);
+    done.hidden = false; done.classList.remove('fadein'); void done.offsetWidth; done.classList.add('fadein');
+  }
+
+  var STEP = 2;
+
+  var TARGET = 72, TOL = 3;
+  var focus = $('focus'), focusState = $('focus-state'), lockBtn = $('lock-focus'), ctl2 = $('ctl-2');
+  function focusBlur() {
+    var d = Math.abs(+focus.value - TARGET);
+    return d <= TOL ? 0 : Math.min(16, 0.6 + (d - TOL) * 0.45);
+  }
+  focus.addEventListener('input', function () {
+    photo.style.transition = 'filter .08s linear';
+    photo.style.filter = 'blur(' + focusBlur().toFixed(1) + 'px) brightness(.6)';
+    focusState.textContent = '';
+  });
+  lockBtn.addEventListener('click', function () {
+    if (focusBlur() > 0) { focusState.textContent = 'Not sharp yet. Keep adjusting, then lock again.'; return; }
+    focus.disabled = true; lockBtn.disabled = true; focusState.textContent = 'Focus locked.';
+    later(function () { ctl2.hidden = true; showDone('Focus locked', 'The negative is sharp and ready to be exposed.'); }, 1100);
+  });
+  function restart() {
+    clearTimers();
+    lamp.style.opacity = 1;
+    focus.disabled = false; lockBtn.disabled = false; focus.value = 8; focusState.textContent = '';
+    photo.style.transition = 'none'; photo.style.opacity = 1;
+    photo.style.filter = 'blur(' + focusBlur().toFixed(1) + 'px) brightness(.6)';
+    void photo.offsetWidth; photo.style.transition = '';
+    ctl2.hidden = false; done.hidden = true; setDots(false);
+    stepName.textContent = 'Focus the image'; stepHint.textContent = 'Drag the slider until the picture is sharp, then lock focus.';
+  }
+
+
+  $('again').addEventListener('click', function () { restart(); window.scrollTo(0, 0); });
+  setPhoto(sampleCanvas());
+  restart();
+})();
+
+</script>
+
+</body></html>

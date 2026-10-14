@@ -1,0 +1,196 @@
+/* Digital Darkroom: one continuous sequence (Pick photo -> Enlarger -> Focus -> Expose -> Develop).
+   Tokens, components and motion are lifted from the four interaction studies in /studies. */
+:root {
+  --bg: #0b0807;
+  --ink: #e3d9cc;
+  --dim: #7a6d63;
+  --safe: #d0402e;
+  --glow: #ffd9a8;
+  --paper: #ece6da;
+  --tray: #15100e;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+[hidden]:not([hidden=until-found i]) { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding-block: 24px 56px;
+  padding-inline: 16px;
+}
+#lamp {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(255,160,110,.22), rgba(0,0,0,0) 65%);
+  transition: opacity 1.4s ease;
+}
+#flood { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0; background: #ffe9d6; }
+#app { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; overflow-x: clip; --ar: .8; }
+
+.topbar { display: flex; flex-wrap: wrap; row-gap: 0; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; min-height: 44px; }
+.brand { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); margin: 0; }
+header { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+#dots { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+#dots li {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  border: 1px dashed var(--dim); color: var(--dim); padding: 4px 10px;
+  transition: border-color .4s, color .4s, background .4s;
+}
+#dots li.current { border: 1px solid var(--safe); color: var(--ink); }
+#dots li.done { border: 1px solid var(--dim); color: var(--ink); background: rgba(255,255,255,.05); }
+h1 { font-size: clamp(22px, 5vw, 30px); font-weight: 500; margin: 0; text-wrap: balance; }
+#stephint { margin: 0; color: var(--dim); min-height: 1.5em; }
+
+/* Starting state: pick the photo to print */
+#intro { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; padding-top: 8px; }
+#intro p { margin: 0; color: var(--dim); max-width: 52ch; }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.linkbtn { font: inherit; color: var(--dim); background: none; border: 0; padding: 12px 4px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.linkbtn:hover { color: var(--ink); }
+.linkbtn:focus-visible { outline: 2px solid var(--safe); outline-offset: 3px; }
+#err { color: #f08a7a; min-height: 1.5em; }
+#dropnote { font-size: 13px; }
+body.dragging #intro { outline: 2px dashed var(--safe); outline-offset: 12px; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+#room.fadein { animation: fadein .9s ease both; }
+
+.bench {
+  display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start;
+  min-height: 300px; margin-bottom: 24px;
+}
+.bench > * { min-width: 0; }
+
+/* The easel holds the one sheet of paper for the whole sequence.
+   Width follows the photo's shape so tall photos never push the controls off a phone screen. */
+.easel {
+  width: min(360px, 100%, calc(46vh * var(--ar) + 28px)); border: 1px dashed var(--dim); padding: 14px; background: #050403;
+  transition: border-color .6s ease, background .6s ease;
+}
+.bench.develop .easel { width: 190px; max-width: 100%; padding: 0; border-color: transparent; background: transparent; }
+
+/* The paper. Under the enlarger it is lit only by the projected negative; under the safelight it reads as cream paper. */
+.paper {
+  width: 100%; background: #1a1714; padding: 10px 10px 30px;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; position: relative; z-index: 3;
+  transition: background .9s ease;
+}
+.paper.lit { background: #4a443d; }
+.paper.safelight { background: var(--paper); }
+.paper.draggable { touch-action: none; cursor: grab; }
+.paper.lifted { cursor: grabbing; transform-origin: center; }
+.paper.in-tray { cursor: default; }
+.paper:focus-visible { outline: 2px solid var(--safe); outline-offset: 4px; }
+.surface { position: relative; overflow: hidden; }
+.surface canvas { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
+/* The projected negative, laid over the paper */
+#photo { position: absolute; inset: 0; height: 100%; transition: filter .9s ease, opacity .8s ease; filter: blur(16px) brightness(.16); }
+/* The latent image on the paper: invisible until it is developed */
+#print { opacity: 0; filter: invert(1) contrast(.5) brightness(1.2); }
+/* In the developer the print appears as a negative, then flips to a positive */
+@keyframes develop {
+  0%   { opacity: 0; filter: invert(1) contrast(.5) brightness(1.2); }
+  18%  { opacity: 1; filter: invert(1) contrast(.95) brightness(1); }
+  100% { opacity: 1; filter: invert(0) contrast(1) brightness(1); }
+}
+.paper.developing #print { animation: develop 9s ease-in-out forwards; }
+.paper.revealed { overflow: hidden; }
+.paper::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.34) 50%, transparent 62%);
+}
+.paper.sheen::after { opacity: 1; animation: sheen 1.3s ease-out forwards; }
+@keyframes sheen { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+@keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.paper .grab { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #8a8174; }
+
+.tray {
+  width: 240px; max-width: 100%; height: 280px; border: 2px dashed var(--dim); background: var(--tray);
+  position: relative; transition: border-color .2s, background .6s;
+}
+.tray.arrive { animation: fadein .9s ease both; }
+.tray.ready { border-color: var(--safe); }
+.tray.active { background: #231713; border-style: solid; }
+/* Tray and paper share one rocking motion (individual translate/rotate props, so the paper's drag transform is untouched) */
+@keyframes agitate {
+  0%   { translate: 0 0;      rotate: 0deg; }
+  15%  { translate: -5px 2px; rotate: -1.4deg; }
+  30%  { translate: 4px -2px; rotate: 1.2deg; }
+  45%  { translate: -4px 1px; rotate: -1deg; }
+  60%  { translate: 5px 2px;  rotate: 1.5deg; }
+  80%  { translate: -3px -1px; rotate: -.8deg; }
+  100% { translate: 0 0;      rotate: 0deg; }
+}
+.tray.agitating, .paper.agitating { animation: agitate 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tray.agitating, .paper.agitating { animation-duration: 3s; } }
+.tray span { position: absolute; top: 8px; left: 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+
+.controls { min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.controls [hidden] { display: none !important; }
+.group { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+.group.fadein { animation: fadein .9s ease both; }
+
+.switch {
+  font: inherit; color: var(--ink); background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 14px; border: 2px solid var(--ink); padding: 8px 16px 8px 8px;
+}
+.switch .track { width: 64px; height: 36px; border: 2px solid var(--ink); position: relative; }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; background: var(--ink); transition: left .2s, background .2s; }
+.switch[aria-checked="true"] .knob { left: 30px; background: var(--safe); }
+.switch .lbl { letter-spacing: .12em; font-size: 13px; width: 5.5ch; text-align: left; }
+.switch:focus-visible, .btn:focus-visible, input[type=range]:focus-visible, .bulb:focus-visible { outline: 2px solid var(--safe); outline-offset: 4px; }
+
+input[type=range] { width: min(420px, 100%); accent-color: var(--safe); height: 44px; cursor: pointer; }
+input[type=range]:disabled { cursor: default; opacity: .6; }
+.label { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+#focus-state { min-height: 1.5em; }
+
+.btn {
+  font: inherit; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+  background: transparent; border: 2px solid var(--ink); padding: 14px 32px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.btn:hover:not(:disabled) { background: rgba(255,255,255,.08); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* Hold-to-expose light bulb */
+.bulb {
+  position: relative; width: 128px; height: 128px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.bulb:disabled { cursor: default; }
+.bulb .ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ring circle { fill: none; stroke-width: 3; }
+.ring .track { stroke: var(--dim); stroke-dasharray: 3 5; opacity: .75; }
+.ring .prog { stroke: var(--safe); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transform: rotate(-90deg); transform-origin: 60px 60px; }
+.bulb .icon {
+  position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; translate: -50% -50%;
+  fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  transition: fill .12s ease, stroke .12s ease, filter .12s ease;
+}
+.bulb.on .icon { fill: var(--glow); stroke: var(--glow); filter: drop-shadow(0 0 16px rgba(255,190,120,.95)); }
+.bulb.on .fil { stroke: #8f5f2e; }
+.bulb.on { color: var(--glow); }
+#exp-read { font-variant-numeric: tabular-nums; text-transform: none; font-size: 14px; }
+
+#done-msg { font-size: clamp(24px, 6vw, 34px); font-weight: 500; margin: 0; }
+#done { margin-top: 4px; }
+#done-sub { margin: 0; color: var(--dim); max-width: 46ch; }
+#save-note { margin: 0; color: var(--dim); min-height: 1.5em; }
+#dev-bar-wrap { width: min(420px, 100%); height: 8px; border: 1px solid var(--dim); }
+#dev-fill { display: block; height: 100%; width: 0; background: var(--safe); }
+
+@media (max-width: 560px) {
+  .bench { gap: 16px; min-height: 0; }
+  .bench.develop { flex-wrap: nowrap; }
+  .bench.develop .easel { width: min(190px, 34vw); }
+  .paper.safelight { padding: 8px 8px 26px; }
+  .tray { width: min(240px, 46vw); height: min(280px, 64vw); }
+  .bulb { width: 144px; height: 144px; }
+}

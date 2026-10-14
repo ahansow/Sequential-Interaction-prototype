@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digital Darkroom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<input type="file" id="file" accept="image/*">
+<div id="lamp"></div>
+<div id="flood"></div>
+
+<div id="app">
+  <div class="topbar">
+    <p class="brand" id="brand">Digital Darkroom</p>
+  </div>
+
+  <!-- Starting state: choose the photograph to print -->
+  <section id="intro">
+    <h1>Make a black-and-white print</h1>
+    <p>Pick a photograph. You will switch on the enlarger, focus the negative, expose one sheet of paper and develop it into a print.</p>
+    <div class="row">
+      <button class="btn" id="use-sample">Use the sample photo</button>
+      <button class="linkbtn" id="choose">Use your own photo</button>
+    </div>
+    <p id="dropnote">You can also drop an image anywhere on this page.</p>
+    <p id="err" role="alert"></p>
+  </section>
+
+  <!-- The darkroom: one continuous sequence -->
+  <section id="room" hidden>
+    <header>
+      <ol id="dots" aria-label="Progress"><li data-i="1">Enlarger</li><li data-i="2">Focus</li><li data-i="3">Expose</li><li data-i="4">Develop</li></ol>
+      <h1 id="stepname">Turn on the enlarger</h1>
+      <p id="stephint">Tap the switch.</p>
+    </header>
+
+    <section class="bench" id="bench" aria-live="polite">
+      <div class="easel" id="easel">
+        <div class="paper" id="paper" aria-label="Photographic paper on the easel">
+          <div class="surface">
+            <canvas id="print" width="480" height="600"></canvas>
+            <canvas id="photo" width="480" height="600" role="img" aria-label="The negative projected onto the paper"></canvas>
+          </div>
+          <div class="grab" id="grab" hidden>Drag me</div>
+        </div>
+      </div>
+      <div class="tray" id="tray" hidden><span>Developer</span></div>
+    </section>
+
+    <section class="controls">
+      <!-- 1 Enlarger -->
+      <div class="group" id="ctl-1" hidden>
+        <button class="switch" id="lamp-switch" role="switch" aria-checked="false">
+          <span class="track"><span class="knob"></span></span>
+          <span class="lbl" id="sw-lbl">OFF</span>
+        </button>
+        <span class="label">Enlarger</span>
+      </div>
+
+      <!-- 2 Focus -->
+      <div class="group" id="ctl-2" hidden>
+        <span class="label">Focus</span>
+        <input id="focus" type="range" min="0" max="100" value="8" aria-label="Focus">
+        <button class="btn" id="lock-focus">Lock focus</button>
+        <span id="focus-state"></span>
+      </div>
+
+      <!-- 3 Expose -->
+      <div class="group" id="ctl-3" hidden>
+        <button class="bulb" id="bulb" aria-label="Hold to expose the paper">
+          <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="56"></circle>
+            <circle class="prog" id="bulb-prog" cx="60" cy="60" r="56" pathLength="1"></circle>
+          </svg>
+          <svg class="icon" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M24 5c-7.2 0-13 5.6-13 12.6 0 4.4 2.2 7.4 4.6 10 1.4 1.5 2.4 3.2 2.4 5.4V35h12v-2c0-2.2 1-3.9 2.4-5.4 2.4-2.6 4.6-5.6 4.6-10C37 10.6 31.2 5 24 5z"></path>
+            <path class="fil" d="M19.5 29l4.5-7 4.5 7"></path>
+            <path d="M18 39h12M20.5 43h7"></path>
+          </svg>
+        </button>
+        <span class="label" id="exp-read">5.0 s</span>
+      </div>
+
+      <!-- 4 Develop -->
+      <div class="group" id="ctl-4" hidden>
+        <span id="dev-text">Drag the paper into the developer tray.</span>
+        <div id="dev-bar-wrap" hidden><i id="dev-fill"></i></div>
+      </div>
+
+      <!-- Step complete / ending -->
+      <div class="group" id="done" hidden>
+        <p id="done-msg"></p>
+        <p id="done-sub"></p>
+        <button class="btn" id="save" hidden>Save photograph</button>
+        <p id="save-note" role="status" hidden></p>
+        <button class="linkbtn" id="again" hidden>Make another print</button>
+      </div>
+    </section>
+  </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
