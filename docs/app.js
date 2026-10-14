@@ -213,7 +213,7 @@
     fadeIn(ctl2);
   }
   /* Behavior Controls: live parameters for the focus slider (width, track, center circle, color) */
-  var TUNE_DEFAULTS = { width: 420, track: 6, thumb: 20, color: '#d0402e' };
+  var TUNE_DEFAULTS = { width: 440, track: 7, thumb: 21, color: '#d0402e' };
   var TUNE_KEY = 'darkroom-focus-slider', tune = {};
   var tuneInputs = Array.prototype.slice.call(document.querySelectorAll('#tune [data-key]')), tuneNote = $('t-note');
   function applyTune() {

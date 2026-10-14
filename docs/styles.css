@@ -152,7 +152,7 @@ input[type=range]:disabled { cursor: default; opacity: .6; }
 
 /* Focus slider: drawn from Behavior Controls parameters (--sl-*), defaults set in app.js */
 #focus {
-  --sl-width: 420px; --sl-track: 6px; --sl-thumb: 20px; --sl-color: #d0402e; --sl-pct: 8%;
+  --sl-width: 440px; --sl-track: 7px; --sl-thumb: 21px; --sl-color: #d0402e; --sl-pct: 8%;
   -webkit-appearance: none; appearance: none; background: transparent;
   width: min(var(--sl-width), 100%); height: max(44px, calc(var(--sl-thumb) + 8px));
 }
