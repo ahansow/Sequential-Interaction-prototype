@@ -208,11 +208,66 @@
   }
   function enterFocus() {
     enterStep(2, 'Focus the image', 'Drag the slider until the picture is sharp, then lock focus.');
-    focus.disabled = false; lockBtn.disabled = false; focus.value = 8; focusState.textContent = '';
+    focus.disabled = false; lockBtn.disabled = false; focus.value = 8; focusState.textContent = ''; syncFill(); tuneNote.textContent = '';
     photo.style.filter = 'blur(' + focusBlur().toFixed(1) + 'px) brightness(.6)';
     fadeIn(ctl2);
   }
+  /* Behavior Controls: live parameters for the focus slider (width, track, center circle, color) */
+  var TUNE_DEFAULTS = { width: 420, track: 6, thumb: 20, color: '#d0402e' };
+  var TUNE_KEY = 'darkroom-focus-slider', tune = {};
+  var tuneInputs = Array.prototype.slice.call(document.querySelectorAll('#tune [data-key]')), tuneNote = $('t-note');
+  function applyTune() {
+    focus.style.setProperty('--sl-width', tune.width + 'px');
+    focus.style.setProperty('--sl-track', tune.track + 'px');
+    focus.style.setProperty('--sl-thumb', tune.thumb + 'px');
+    focus.style.setProperty('--sl-color', tune.color);
+    tuneInputs.forEach(function (el) {
+      var k = el.getAttribute('data-key');
+      el.value = tune[k];
+      el.nextElementSibling.textContent = tune[k] + (el.getAttribute('data-unit') || '');
+    });
+    try { localStorage.setItem(TUNE_KEY, JSON.stringify(tune)); } catch (e) {}
+  }
+  function syncFill() { focus.style.setProperty('--sl-pct', focus.value + '%'); }
+  try { tune = JSON.parse(localStorage.getItem(TUNE_KEY)) || {}; } catch (e) { tune = {}; }
+  Object.keys(TUNE_DEFAULTS).forEach(function (k) { if (tune[k] === undefined) tune[k] = TUNE_DEFAULTS[k]; });
+  tuneInputs.forEach(function (el) {
+    el.addEventListener('input', function () {
+      var k = el.getAttribute('data-key');
+      tune[k] = el.type === 'color' ? el.value : +el.value;
+      tuneNote.textContent = '';
+      applyTune();
+    });
+  });
+  $('t-reset').addEventListener('click', function () {
+    Object.keys(TUNE_DEFAULTS).forEach(function (k) { tune[k] = TUNE_DEFAULTS[k]; });
+    applyTune(); tuneNote.textContent = 'Defaults restored.';
+  });
+  function tunePrompt() {
+    return 'In the Digital Darkroom prototype (docs/), restyle the step 2 Focus slider (#focus) with these Behavior Controls values:\n' +
+      '- Slider width: ' + tune.width + 'px (never wider than its column)\n' +
+      '- Track thickness: ' + tune.track + 'px\n' +
+      '- Center circle (thumb) diameter: ' + tune.thumb + 'px\n' +
+      '- Color (filled track and thumb): ' + tune.color + '\n' +
+      'Make these the new defaults in TUNE_DEFAULTS. Keep the focus target (72 \u00b1 3), blur mapping and Lock focus behavior unchanged.';
+  }
+  $('t-copy').addEventListener('click', function () {
+    var text = tunePrompt();
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+      tuneNote.textContent = ok ? 'Prompt copied.' : 'Copy failed. Select and copy this: ' + text;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { tuneNote.textContent = 'Prompt copied.'; }, fallback);
+    } else { fallback(); }
+  });
+  applyTune();
+
   focus.addEventListener('input', function () {
+    syncFill();
     if (STEP !== 2) return;
     photo.style.transition = 'filter .08s linear';
     photo.style.filter = 'blur(' + focusBlur().toFixed(1) + 'px) brightness(.6)';
