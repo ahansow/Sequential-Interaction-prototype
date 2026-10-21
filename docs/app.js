@@ -187,7 +187,7 @@
   /* ---------- Step 1: Enlarger (tap the switch) ---------- */
   var sw = $('lamp-switch'), swLbl = $('sw-lbl'), ctl1 = $('ctl-1');
   function enterEnlarger() {
-    enterStep(1, 'Turn on the enlarger', 'Tap the switch.');
+    enterStep(1, 'Turn on the enlarger', '');
     sw.setAttribute('aria-checked', 'false'); swLbl.textContent = 'OFF';
     fadeIn(ctl1);
   }
@@ -208,7 +208,7 @@
     return d <= TOL ? 0 : Math.min(16, 0.6 + (d - TOL) * 0.45);
   }
   function enterFocus() {
-    enterStep(2, 'Focus the image', 'Drag the slider until the picture is sharp, then lock focus.');
+    enterStep(2, 'Focus the image', '');
     focus.disabled = false; lockBtn.disabled = false; focus.value = 8; focusState.textContent = ''; syncFill();
     photo.style.filter = 'blur(' + focusBlur().toFixed(1) + 'px) brightness(.6)';
     fadeIn(ctl2);
@@ -276,7 +276,7 @@
   bulb.addEventListener('blur', stopHold);
   window.addEventListener('blur', stopHold);
   function enterExpose() {
-    enterStep(3, 'Expose', 'Press and hold the light bulb until the exposure is done.');
+    enterStep(3, 'Expose', '');
     expP = 0; holding = false; exposed = false;
     bulb.disabled = false; bulb.classList.remove('on');
     prog.style.strokeDashoffset = 1; expRead.textContent = EXPOSE_S.toFixed(1) + ' s';
@@ -321,8 +321,7 @@
         paper.setAttribute('tabindex', '0'); paper.setAttribute('role', 'button');
         paper.setAttribute('aria-label', 'Exposed photographic paper. Drag it into the developer tray, or press Enter to place it.');
         grab.hidden = false;
-        stepHint.textContent = 'Drag the paper into the developer tray.';
-        devText.textContent = 'Drag the paper into the developer tray.';
+        stepHint.textContent = ''; devText.textContent = '';
         fadeIn(ctl4);
       }, DUR);
     }, 900);
