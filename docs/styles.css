@@ -111,13 +111,53 @@ body.dragging #intro { outline: 2px dashed var(--safe); outline-offset: 12px; }
 @keyframes fadein { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .paper .grab { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #8a8174; }
 
+/* Developer tray, seen from above: a raised rim with a pour spout, a sloped inner well with
+   ribs along the floor, and a shallow layer of developer that ripples while the tray is rocked */
 .tray {
-  width: 240px; max-width: 100%; height: 280px; border: 2px dashed var(--dim); background: var(--tray);
-  position: relative; transition: border-color .2s, background .6s;
+  --rim: 16px;
+  width: 250px; max-width: 100%; height: 292px; padding: var(--rim); border-radius: 3px 12px 12px 12px;
+  border: 2px solid #3b322c; background: linear-gradient(160deg, #241c18, #16110f 70%);
+  box-shadow: 0 10px 26px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
+  position: relative; transition: border-color .2s, box-shadow .4s;
+}
+/* pour spout: the near-left corner of the rim comes to a point, with a lip line across it */
+.tray::before {
+  content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 2px; border-radius: 2px;
+  background: #3b322c; transform-origin: 0 0; transform: translate(0, 16px) rotate(-45deg); transition: background .2s;
+}
+.tray .well {
+  position: relative; height: 100%; border-radius: 6px; overflow: hidden;
+  border: 1px solid #2c2420; background: #0d0a09;
+  box-shadow: inset 0 0 0 5px #130f0d, inset 0 8px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03);
+}
+/* ribs on the floor keep the print from sticking */
+.tray .well::before {
+  content: ''; position: absolute; inset: 14px 18px; border-radius: 3px; opacity: .7;
+  background: repeating-linear-gradient(90deg, transparent 0 16px, rgba(255,255,255,.035) 16px 18px, rgba(0,0,0,.35) 18px 20px);
+}
+/* the developer: a dark, faintly warm liquid with a soft reflection of the safelight */
+.tray .liquid {
+  position: absolute; inset: 0; opacity: .25; transition: opacity .8s ease;
+  background:
+    radial-gradient(ellipse 70% 40% at 35% 22%, rgba(208,64,46,.18), transparent 70%),
+    linear-gradient(180deg, rgba(60,30,22,.55), rgba(20,10,8,.75));
+}
+.tray .liquid::after {
+  content: ''; position: absolute; inset: -20%;
+  background: repeating-linear-gradient(115deg, transparent 0 22px, rgba(255,217,168,.05) 22px 26px, transparent 26px 48px);
+}
+.tray .tray-label {
+  position: absolute; top: 0; left: 26px; line-height: var(--rim);
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim);
 }
 .tray.arrive { animation: fadein .9s ease both; }
 .tray.ready { border-color: var(--safe); }
-.tray.active { background: #231713; border-style: solid; }
+.tray.ready::before { background: var(--safe); }
+.tray.ready { box-shadow: 0 10px 26px rgba(0,0,0,.55), 0 0 0 1px rgba(208,64,46,.35), inset 0 1px 0 rgba(255,255,255,.05); }
+.tray.ready .liquid, .tray.active .liquid { opacity: 1; }
+@keyframes slosh { 0% { transform: translateX(-6%) skewX(0deg); } 50% { transform: translateX(6%) skewX(-3deg); } 100% { transform: translateX(-6%) skewX(0deg); } }
+.tray.agitating .liquid::after { animation: slosh 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tray.agitating .liquid::after { animation-duration: 3s; } }
 /* Tray and paper share one rocking motion (individual translate/rotate props, so the paper's drag transform is untouched) */
 @keyframes agitate {
   0%   { translate: 0 0;      rotate: 0deg; }
@@ -130,7 +170,6 @@ body.dragging #intro { outline: 2px dashed var(--safe); outline-offset: 12px; }
 }
 .tray.agitating, .paper.agitating { animation: agitate 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .tray.agitating, .paper.agitating { animation-duration: 3s; } }
-.tray span { position: absolute; top: 8px; left: 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
 
 .controls { min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .controls [hidden] { display: none !important; }
@@ -211,6 +250,6 @@ input[type=range]:disabled { cursor: default; opacity: .6; }
   .bench.develop { flex-wrap: nowrap; }
   .bench.develop .easel { width: min(190px, 34vw); }
   .paper.safelight { padding: 8px 8px 26px; }
-  .tray { width: min(240px, 46vw); height: min(280px, 64vw); }
+  .tray { --rim: 12px; width: min(250px, 48vw); height: min(292px, 66vw); }
   .bulb { width: 144px; height: 144px; }
 }

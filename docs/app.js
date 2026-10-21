@@ -375,7 +375,7 @@
     placed = true;
     var pr = paper.getBoundingClientRect(), tr = tray.getBoundingClientRect();
     tx += (tr.left + tr.width / 2) - (pr.left + pr.width / 2);
-    ty += (tr.top + tr.height / 2) - (pr.top + pr.height / 2) + 10;
+    ty += (tr.top + tr.height / 2) - (pr.top + pr.height / 2);
     paper.style.transition = 'transform .45s ease';
     applyMove(false);
     paper.classList.add('in-tray');
