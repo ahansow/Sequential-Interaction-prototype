@@ -155,6 +155,7 @@
   var lamp = $('lamp'), flood = $('flood'), brand = $('brand'), stepName = $('stepname'), stepHint = $('stephint');
   var done = $('done'), doneMsg = $('done-msg'), doneSub = $('done-sub'), saveBtn = $('save'), saveNote = $('save-note'), again = $('again');
   var paper = $('paper'), easel = $('easel'), bench = $('bench'), tray = $('tray'), grab = $('grab');
+  var controls = document.querySelector('.controls');
   var dots = Array.prototype.slice.call(document.querySelectorAll('#dots li')), timers = [], STEP = 0;
   var reduce = function () { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; };
   function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
@@ -414,7 +415,12 @@
     var rm = reduce();
     var vh = window.innerHeight;
     var pr = paper.getBoundingClientRect(), ar = app.getBoundingClientRect(), br = bench.getBoundingClientRect();
-    var sc = Math.max(1.2, Math.min(ar.width / pr.width, (vh * 0.66) / pr.height));
+    /* size the print so it and the ending panel (Save, Make another print) fit in one screen:
+       below the header when there is room, otherwise scrolled up to the top of the bench */
+    var panelH = measureFinalPanel(), below = 20 + 24 + panelH + 16;
+    var avail = vh - br.top - 8 - below, scroll = false;
+    if (br.top < 0 || avail < vh * 0.45) { scroll = true; avail = vh * 0.94 - 8 - below; }
+    var sc = Math.max(1, Math.min(ar.width / pr.width, avail / pr.height));
     var dx = (ar.left + ar.width / 2) - (pr.left + pr.width / 2);
     var dy = (br.top + 8 + pr.height * sc / 2) - (pr.top + pr.height / 2);
     var DUR = rm ? 500 : 3000;
@@ -422,6 +428,7 @@
     /* room for the big print: the bench grows and pushes the controls down */
     bench.style.transition = 'min-height 1.5s cubic-bezier(.3,.7,.2,1)';
     bench.style.minHeight = Math.ceil(pr.height * sc + 20) + 'px';
+    controls.style.minHeight = (panelH + 4) + 'px';   // hold the ending panel's space so the page can scroll to fit it
 
     tray.style.transition = 'opacity 1.2s ease .15s, transform 1.4s ease';
     tray.style.opacity = 0; tray.style.transform = 'translateY(10px)';
@@ -442,10 +449,10 @@
       { boxShadow: '0 34px 90px rgba(0,0,0,.75)' }
     ], { duration: DUR, fill: 'forwards' });
 
-    /* bring the finished print into view on shorter screens */
-    later(function () {
+    /* on short screens, bring the bench to the top so the print and the ending panel fit together */
+    if (scroll) later(function () {
       var want = br.top + window.scrollY - vh * 0.06;
-      if (want > window.scrollY + 4) window.scrollTo({ top: want, behavior: rm ? 'auto' : 'smooth' });
+      if (Math.abs(want - window.scrollY) > 4) window.scrollTo({ top: want, behavior: rm ? 'auto' : 'smooth' });
     }, rm ? 0 : 1500);
 
     later(function () { paper.classList.add('sheen'); }, DUR - 400);
@@ -453,11 +460,22 @@
   }
 
   /* ---------- Ending: save the print, or make another ---------- */
-  function finish() {
-    stepName.textContent = 'Photograph developed'; stepHint.textContent = '';
+  function fillFinalPanel() {
     doneMsg.textContent = 'Photograph developed'; doneSub.textContent = 'Your print is ready.';
     saveBtn.hidden = !canSave; saveBtn.disabled = false; saveNote.hidden = false; saveNote.textContent = '';
     again.hidden = false;
+  }
+  /* height of the ending panel, measured off-screen before the print is sized */
+  function measureFinalPanel() {
+    fillFinalPanel();
+    done.style.visibility = 'hidden'; done.hidden = false;
+    var h = done.getBoundingClientRect().height;
+    done.hidden = true; done.style.visibility = '';
+    return Math.ceil(h);
+  }
+  function finish() {
+    stepName.textContent = 'Photograph developed'; stepHint.textContent = '';
+    fillFinalPanel();
     setDots(true);
     fadeIn(done);
   }
@@ -515,7 +533,7 @@
     paper.setAttribute('aria-label', 'Photographic paper on the easel');
     grab.hidden = true;
     photo.style.transition = 'none'; photo.style.opacity = 1; photo.style.filter = 'blur(16px) brightness(.16)';
-    bench.classList.remove('develop'); bench.style.transition = ''; bench.style.minHeight = '';
+    bench.classList.remove('develop'); bench.style.transition = ''; bench.style.minHeight = ''; controls.style.minHeight = '';
     easel.style.transition = '';
     tray.hidden = true; tray.className = 'tray'; tray.style.transition = ''; tray.style.opacity = ''; tray.style.transform = '';
     devBarWrap.hidden = true; devFill.style.transition = 'none'; devFill.style.width = '0';
